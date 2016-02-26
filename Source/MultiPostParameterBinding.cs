@@ -65,7 +65,7 @@ namespace Keith5000.ModelBinding
 				stringValue = parameters[Descriptor.ParameterName];
 
 			// if not found in body, try reading query string
-			if (stringValue == null)
+			if (stringValue == null && !parameters.AllKeys.Contains(Descriptor.ParameterName))
 			{
 				var queryStringPairs = actionContext.Request.GetQueryNameValuePairs();
 				if (queryStringPairs != null)
@@ -84,7 +84,7 @@ namespace Keith5000.ModelBinding
 				else if (Descriptor.ParameterType.IsEnum)
 					paramValue = Enum.Parse(Descriptor.ParameterType, stringValue);
 				else if (Descriptor.ParameterType.IsPrimitive || Descriptor.ParameterType.IsValueType)	// TODO: Are these conditions ok? I'd rather not have to check that the type implements IConvertible.
-					paramValue = Convert.ChangeType(stringValue, Descriptor.ParameterType);
+					paramValue = TypeDescriptor.GetConverter(Descriptor.ParameterType).ConvertFromInvariantString(stringValue);
 				else
 					// when deserializing an object, pass in the global settings so that custom converters, etc. are honored
 					paramValue = JsonConvert.DeserializeObject(stringValue, Descriptor.ParameterType, GlobalConfiguration.Configuration.Formatters.JsonFormatter.SerializerSettings);
@@ -92,6 +92,10 @@ namespace Keith5000.ModelBinding
 				// Set the binding result here
 				SetValue(actionContext, paramValue);
 			}
+		        else if(parameters.AllKeys.Contains(Descriptor.ParameterName))
+		        {
+		            SetValue(actionContext, null);
+		        }
 
 			// now, we can return a completed task with no result
 			TaskCompletionSource<object> tcs = new TaskCompletionSource<object>();
@@ -125,7 +129,7 @@ namespace Keith5000.ModelBinding
 							var values = JsonConvert.DeserializeObject<Dictionary<string, object>>(content);
 							result = values.Aggregate(new NameValueCollection(), (seed, current) =>
 							{
-								seed.Add(current.Key, current.Value == null ? "" : current.Value.ToString());
+								seed.Add(current.Key, current.Value == null ? null : current.Value.ToString());
 								return seed;
 							});
 							break;
